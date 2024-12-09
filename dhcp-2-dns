@@ -1,3 +1,10 @@
+# External DNS config
+#  add the api url here. t.ex.  192.168.1.10:5380
+#  if empty, no externel dns updates will be tried
+:local DnsServer ""
+:local ApiToken "YourApiTokenHere"
+
+# Internal DNS config
 :local DHCPtag   "#*# Created by DHCP2DNS #*#"
 :local LogPrefix "DHCP2DNS ($leaseServerName)"
 
@@ -95,6 +102,10 @@
     add address=$leaseActIP name=$fqdn ttl=$ttl comment=$DHCPtag disabled=no
     :log info "$LogPrefix: Static domain name '$fqdn' created for '$leaseActIP' with ttl '$ttl'"
     
+    :if ( [ :len $DnsServer ] != 0) do=\ 
+    {
+      /tool/fetch ( "http://".$DnsServer."/api/zones/records/add?domain=".$fqdn."&zone=".$domain."&type=A&overwrite=true&IPAddress=".$leaseActIP."&token=".$ApiToken."&ttl=".$ttl ) dst-path=bound.tmp ;
+    }\
   }\
   else=\
   {
@@ -114,5 +125,11 @@ else=\
   {
     remove $dnsDhcpId
     :log info "$LogPrefix: Static DNS name(s) for '$leaseActIP' removed"
+    :if ( [ :len $DnsServer ] != 0) do=\ 
+    {
+      :local fqdn [ /ip dns static get $dnsDhcpId name ]
+      :local domain [:pick $fqdn ( [:find $fqdn "."] + 1 ) 9999 ]
+      /tool/fetch ( "http://".$DnsServer."/api/zones/records/delete?domain=".$fqdn."&zone=".$domain."&type=A&overwrite=true&IPAddress=".$leaseActIP."&token=".$ApiToken."&ttl=".$ttl ) dst-path=release.tmp ;.
+    }
   }
 }
