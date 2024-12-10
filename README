@@ -1,3 +1,7 @@
-The base of the script is NOT mine. It comes from https://forum.mikrotik.com/viewtopic.php?t=119469
+files:
+-  dhcp-2-dns - script for the mikrotik dhcp service
+-  force-dns-usage - NAT rules to force usage of the DNS regardless client config. Also a netwatch to monitor dns availability and manipulate NAT accorfingly
+-  oxidized - rules for oxidized to avoid backups due to dhcp2dns changes
 
-Add the script in the script module from your mikrotik dhcp-server.
+
+NOTE: The base of the 'dhcp-2-dns' script is NOT mine.  It comes from https://forum.mikrotik.com/viewtopic.php?t=119469
