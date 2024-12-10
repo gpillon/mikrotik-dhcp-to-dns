@@ -1,0 +1,6 @@
+# exclude DHCP server added DNS names from the backup
+# add in t.ex.
+# .config/oxidized/model/routeros.rb
+
+
+cfg.reject! { |line| line[/.* Created by DHCP2DNS .*$/] }
