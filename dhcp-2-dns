@@ -123,13 +123,13 @@ else=\
 
   :if ( [ :len $dnsDhcpId ] > 0 ) do=\
   {
-    remove $dnsDhcpId
-    :log info "$LogPrefix: Static DNS name(s) for '$leaseActIP' removed"
     :if ( [ :len $DnsServer ] != 0) do=\ 
     {
       :local fqdn [ /ip dns static get $dnsDhcpId name ]
       :local domain [:pick $fqdn ( [:find $fqdn "."] + 1 ) 9999 ]
-      /tool/fetch ( "http://".$DnsServer."/api/zones/records/delete?domain=".$fqdn."&zone=".$domain."&type=A&overwrite=true&IPAddress=".$leaseActIP."&token=".$ApiToken."&ttl=".$ttl ) dst-path=release.tmp ;.
+      /tool/fetch ( "http://".$DnsServer."/api/zones/records/delete?domain=".$fqdn."&zone=".$domain."&type=A&overwrite=true&IPAddress=".$leaseActIP."&token=".$ApiToken."&ttl=".$ttl ) dst-path=release.tmp ;
     }
+    remove $dnsDhcpId
+    :log info "$LogPrefix: Static DNS name(s) for '$leaseActIP' removed"
   }
 }
