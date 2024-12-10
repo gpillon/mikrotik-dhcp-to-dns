@@ -1,0 +1,16 @@
+# Let the DHCP server assign dns 1.1.1.1 9.9.9.9 and 8.8.8.8
+#
+# The NAT rules will force usage of our own (technitium) DNS
+# The netwatch disables NAT when the dns server is not listning on port 53
+#   and (re)enable when it is listning. This avoids communication errors when the dns is down
+#
+
+/ip firewall nat add action=dst-nat chain=dstnat comment=force-dns dst-port=53 in-interface=bridge-lan protocol=udp to-addresses=<technitium-dns-ip>
+/ip firewall nat add action=dst-nat chain=dstnat comment=force-dns dst-port=53 in-interface=bridge-lan protocol=tcp to-addresses=<technitium-dns-ip>
+
+/tool netwatch add disabled=no down-script="log warn \"Disable dns redirect\"\
+    \nip/firewall/nat/disable [find where comment=\"force-dns\" and !disabled ]" \ 
+    host=<technitium-dns-ip> http-codes="" interval=5s port=53 src-address=<router-ip> test-script="" \
+    type=tcp-conn up-script="log info \"Enable dns redirect\"\
+    \n/ip/firewall/nat/enable [find where comment=\"force-dns\" and disabled ]"
+
