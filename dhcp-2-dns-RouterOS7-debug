@@ -1,0 +1,55 @@
+# Test configuration
+:local leaseBound 1
+:local leaseServerName "<<<DHCP SERVER NAME HERE!!!!>>>"
+:local leaseActIP "<<<EXISTING IP HERE!!!!>>>"
+
+# Internal DNS config
+:local DHCPtag   "#*# Created by DHCP2DNS #*#"
+:local LogPrefix "DHCP2DNS TEST ($leaseServerName)"
+
+# Test helper function
+:local testLog do={
+    :put $msg
+    :log info $msg
+}
+
+$testLog msg="=== Starting DHCP to DNS Test ==="
+$testLog msg="Testing with IP: $leaseActIP"
+$testLog msg="DHCP Server: $leaseServerName"
+
+# Test network lookup
+$testLog msg="=== Testing Network Lookup ==="
+/ip/address
+:local networks [find]
+:foreach id in=$networks do={
+    :local address [get $id address]
+    :local network [get $id network]
+    :put "Checking network: $network"
+    :if ($leaseActIP in $network) do={
+        :put "MATCH FOUND in network: $network"
+        :local comment [get $id comment]
+        :put "Network comment: $comment"
+    }
+}
+
+# Test DHCP network lookup
+$testLog msg="=== Testing DHCP Network Lookup ==="
+/ip/dhcp-server/network
+:local dhcpNets [find]
+:foreach id in=$dhcpNets do={
+    :local address [get $id address]
+    :local domain [get $id domain]
+    :put "Checking DHCP network: $address"
+    :put "Domain: $domain"
+}
+
+# Test lease lookup
+$testLog msg="=== Testing Lease Lookup ==="
+/ip/dhcp-server/lease
+:local leaseId [find where address=$leaseActIP]
+:if ([:len $leaseId] = 1) do={
+    :local hostname [get $leaseId host-name]
+    :put "Found lease with hostname: $hostname"
+}
+
+$testLog msg="=== Test Complete ==="
