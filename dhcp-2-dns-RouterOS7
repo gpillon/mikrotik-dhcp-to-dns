@@ -1,0 +1,125 @@
+# Internal DNS config
+:local DHCPtag   "#*# Created by DHCP2DNS #*#"
+:local LogPrefix "DHCP2DNS ($leaseServerName)"
+
+# Functions
+# remove \0 and spaces from string
+:local trimString do={
+    :local outStr
+    :for i from=0 to=([:len $inStr] - 1) do={
+        :local tmp [:pick $inStr $i]
+        :if (($tmp !=" ") and ($tmp !="\00")) do={
+            :set outStr ($outStr . $tmp)
+        }
+    }
+    :return $outStr
+}
+
+# IP to hostname converter
+:local ip2Host do={
+    :local outStr
+    :for i from=0 to=([:len $inStr] - 1) do={
+        :local tmp [:pick $inStr $i]
+        :if ($tmp =".") do={
+            :set tmp "-"
+        }
+        :set outStr ($outStr . $tmp)
+    }
+    :return $outStr
+}
+
+# Main script
+:if ([:len $leaseActIP] <= 0) do={
+    :log error "$LogPrefix: empty lease address"
+    :error "empty lease address"
+}
+
+:if ($leaseBound = 1) do={
+    # new DHCP lease added
+    
+    # Get TTL from DHCP server
+    /ip/dhcp-server
+    :local ttl
+    :do {
+        :set ttl [get [find where name=$leaseServerName] lease-time]
+        :local hrs [:pick $ttl 0 2]
+        :local min [:pick $ttl 3 5]
+        :local sec [:pick $ttl 6 8]
+        :set ttl (($hrs * 3600) + ($min * 60) + $sec)
+    } on-error={
+        :set ttl 3600
+        :log warning "$LogPrefix: Error getting lease time, using default 1 hour"
+    }
+    
+    # Get server interface
+    /ip/dhcp-server
+    :local serverInterface ""
+    :do {
+        :set serverInterface [get [find where name=$leaseServerName] interface]
+    } on-error={
+        :log error "$LogPrefix: Could not find server interface"
+        :error "Server interface not found"
+    }
+    
+    # Get domain from DHCP network
+    :local domain ""
+    /ip/dhcp-server/network
+    :do {
+        :local ipParts [:toip $leaseActIP]
+        :local networks [find]
+        :foreach id in=$networks do={
+            :local address [get $id address]
+            :if ([:typeof $address] = "str") do={
+                :local networkIp [:pick $address 0 [:find $address "/"]]
+                :local networkMask [:pick $address ([:find $address "/"]+1) [:len $address]]
+                :if ($leaseActIP in $address) do={
+                    :set domain [get $id domain]
+                }
+            }
+        }
+    } on-error={
+        :log error "$LogPrefix: Error processing networks"
+    }
+    
+    :set domain [$trimString inStr=$domain]
+    
+    :if ([:len $domain] = 0) do={
+        :log warning "$LogPrefix: Empty domain for IP $leaseActIP, cannot create static DNS name"
+        :error "Empty domain for IP $leaseActIP"
+    }
+    
+    # Get hostname from lease
+    :local hostname ""
+    /ip/dhcp-server/lease
+    :local leaseId [find where address=$leaseActIP]
+    :if ([:len $leaseId] = 1) do={
+        :set hostname [get $leaseId host-name]
+        :set hostname [$trimString inStr=$hostname]
+    }
+    
+    # If no hostname, generate one from IP
+    :if ([:len $hostname] = 0) do={
+        :set hostname [$ip2Host inStr=$leaseActIP]
+        :log info "$LogPrefix: Empty hostname for '$leaseActIP', using generated host name '$hostname'"
+    }
+    
+    # Create the full domain name
+    :local fqdn ($hostname . "." . $domain)
+    
+    # Add/Update DNS entry
+    /ip/dns/static
+    :if ([:len [find where name=$fqdn and address=$leaseActIP and disabled=no]] = 0) do={
+        add address=$leaseActIP name=$fqdn ttl=$ttl comment=$DHCPtag disabled=no
+        :log info "$LogPrefix: Static domain name '$fqdn' created for '$leaseActIP' with ttl '$ttl'"
+    } else={
+        :log info "$LogPrefix: DNS entry for '$fqdn' already exists"
+    }
+} else={
+    # DHCP lease removed
+    /ip/dns/static
+    :local dnsDhcpId [find where address=$leaseActIP and comment=$DHCPtag]
+    :if ([:len $dnsDhcpId] > 0) do={
+        remove $dnsDhcpId
+        :log info "$LogPrefix: Static DNS name(s) for '$leaseActIP' removed"
+    }
+}
